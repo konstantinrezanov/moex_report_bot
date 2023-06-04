@@ -6,8 +6,6 @@ WORKDIR /app
 
 COPY requirements.txt ./
 
-RUN apt install libxml2 libxslt
-
 RUN pip install --no-cache-dir --upgrade pip \
     && pip --no-cache-dir install -r requirements.txt
 
