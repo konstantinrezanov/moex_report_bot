@@ -5,10 +5,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import data_handle
 import ticker_update
 import tempfile
+import os
 
-bot = telebot.TeleBot('', parse_mode=None)
+telegram_api_key = os.getenv('TELEGRAM_API_KEY')
+bot = telebot.TeleBot(telegram_api_key, parse_mode=None)
 
-db_path = "data/tickers.json"
+db_path = "./data/tickers.json"
 
 scheduler = BackgroundScheduler()
 
@@ -164,7 +166,6 @@ def create_jobs(job_dict: dict):
 def main():
     create_jobs(data_handle.get_user_time(db_path))
     scheduler.start()
-    scheduler.print_jobs()
     bot.infinity_polling()
 
 
