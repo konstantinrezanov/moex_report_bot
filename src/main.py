@@ -36,6 +36,9 @@ def send_welcome(message: types.Message):
                                'Торги на MOEX закрываются в 19:00 (по МСК). В какое время вы хотите получать отчет?',
                                reply_markup=markup)
         bot.register_next_step_handler(msg, time_select)
+    else:
+        bot.send_message(message.chat.id,
+                         "Вы уже добавляли свои данные. Чтобы изменить список тикеров, используйте команду: /update_tickers")
 
 
 def time_select(message: types.Message):
