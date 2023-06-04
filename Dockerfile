@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY requirements.txt ./
 
-RUN apt install libxml2-dev libxslt-dev libiconv-dev
+RUN apt install build-dep python3-lxml
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip --no-cache-dir install -r requirements.txt
