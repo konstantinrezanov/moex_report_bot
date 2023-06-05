@@ -3,10 +3,10 @@ import data_handle
 
 
 # def tinkoff_update():
-def bcs_update(file_path: str, db_path: str, chat_id: int, time_choice: tuple):
-    bcs=pd.read_excel(file_path)
-    data_handle.store_tickers(db_path, chat_id, tickers, time_choice)
-def excel_update(file_path: str, db_path: str, chat_id: int, time_choice: tuple):
+# def bcs_update(file_path: str, db_path: str, chat_id: int, time_choice: tuple):
+#     bcs=pd.read_excel(file_path)
+#     data_handle.store_tickers(db_path, chat_id, tickers, time_choice)
+def excel_update(file_path: str, db_path: str, chat_id: int):
     """
     Updates tickers data from an Excel file and stores it in the database.
 
@@ -20,4 +20,4 @@ def excel_update(file_path: str, db_path: str, chat_id: int, time_choice: tuple)
         None
     """
     tickers = pd.read_excel(file_path)['ticker']
-    data_handle.store_tickers(db_path, chat_id, tickers, time_choice)
+    data_handle.store_tickers(db_path, chat_id, tickers)
