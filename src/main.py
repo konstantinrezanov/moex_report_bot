@@ -6,6 +6,8 @@ import data_handle
 import ticker_update
 import tempfile
 import os
+import moex
+import report
 
 telegram_api_key = os.getenv('TELEGRAM_API_KEY')
 bot = telebot.TeleBot(telegram_api_key, parse_mode=None)
@@ -148,8 +150,10 @@ def send_report(user_id: int):
     Returns:
         None
     """
-    data = data_handle.get_user_tickers(db_path, user_id)
-    bot.send_message(user_id, str(data))
+    user_ticker=data_handle.get_user_tickers(db_path, user_id)
+    data = moex.moex_counter(user_ticker)
+
+    bot.send_message(user_id, report.format_report(data))
 
 
 def create_jobs(job_dict: dict):

@@ -24,7 +24,7 @@ def format_ticker(ticker_info: pd.Series) -> str:
     Returns:
         str: The formatted ticker information string.
     """
-    return f"{ticker_info['ticker']}: {ticker_info['close']}"
+    return f"{ticker_info['ticker']}   {ticker_info['close_price']}   {ticker_info['DoD']}%   {ticker_info['WoW']}%   {ticker_info['MoM']}%   {ticker_info['YoY']}%"
 
 
 def format_report(exchange_data: pd.DataFrame) -> str:
@@ -38,4 +38,4 @@ def format_report(exchange_data: pd.DataFrame) -> str:
         str: The formatted exchange data report string.
     """
     report_lines = [format_ticker(exchange_data.iloc[i]) for i in exchange_data.index]
-    return "\n".join(report_lines)
+    return "Тикер  Цена     DoD     WoW     MoM     YoY\n"+"\n".join(report_lines)
