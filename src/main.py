@@ -1,3 +1,5 @@
+import datetime
+
 import telebot
 from telebot import types
 from telebot.types import ReplyKeyboardMarkup
@@ -6,6 +8,8 @@ import data_handle
 import ticker_update
 import tempfile
 import os
+import moex
+import report
 
 telegram_api_key = os.getenv('TELEGRAM_API_KEY')
 bot = telebot.TeleBot(telegram_api_key, parse_mode=None)
@@ -35,13 +39,13 @@ def send_welcome(message: types.Message):
         msg = bot.send_message(message.chat.id,
                                'Торги на MOEX закрываются в 19:00 (по МСК). В какое время вы хотите получать отчет?',
                                reply_markup=markup)
-        bot.register_next_step_handler(msg, time_select)
+        bot.register_next_step_handler(msg, time_select, **{"from_welcome": True})
     else:
         bot.send_message(message.chat.id,
                          "Вы уже добавляли свои данные. Чтобы изменить список тикеров, используйте команду: /update_tickers")
 
 
-def time_select(message: types.Message):
+def time_select(message: types.Message, from_welcome=False):
     """
     Handles the user's selection of time and proceeds to update_ticker function.
 
@@ -53,34 +57,66 @@ def time_select(message: types.Message):
     """
     if message.text == "В 19:00":
         chosen_time = (19, 0)
+        data_handle.store_time(db_path, message.chat.id, chosen_time)
+        bot.send_message(message.chat.id, "Время выбрано")
+        if from_welcome:
+            update_ticker(message)
+
     else:
-        chosen_time = (0, 0)
-    bot.send_message(message.chat.id, "Время выбрано", reply_markup=types.ReplyKeyboardRemove())
-    update_ticker(message, chosen_time)
+        msg = bot.send_message(message.chat.id, "Введите желаемое время в формате 00:00")
+        bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
+
+
+@bot.message_handler(commands=['update_time'])
+def update_time(message: types.Message):
+    markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True,
+                                                            one_time_keyboard=True)
+    markup.add("В 19:00", "Другое")
+    msg = bot.send_message(message.chat.id,
+                           'Торги на MOEX закрываются в 19:00 (по МСК). В какое время вы хотите получать отчет?',
+                           reply_markup=markup)
+    bot.register_next_step_handler(msg, time_select)
+
+
+def custom_time(message: types.Message, from_welcome=False):
+    try:
+        user_choice = parse_time(message.text.strip())
+        data_handle.store_time(db_path, message.chat.id, user_choice)
+        msg = bot.send_message(message.chat.id, "Время выбрано")
+        if from_welcome:
+            update_ticker(msg)
+    except ValueError:
+        msg = bot.send_message(message.chat.id, "Неверный формат времени")
+        bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
+
+
+def parse_time(time_input: str) -> tuple:
+    try:
+        time = datetime.datetime.strptime(time_input, "%H:%M")
+        return time.hour, time.minute
+    except:
+        raise ValueError
 
 
 @bot.message_handler(commands=['update_tickers'])
-def update_ticker(message: types.Message, time_choice: tuple = None):
+def update_ticker(message: types.Message):
     """
     Handles the '/update_tickers' command and prompts the user to choose a broker for data update.
 
     Args:
         message (types.Message): The received message object.
-        time_choice (tuple, optional): A tuple representing the time choice. Defaults to None.
 
     Returns:
         None
     """
-    if time_choice is None:
-        time_choice = data_handle.get_user_time(db_path)[message.chat.id]
     markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True)
     markup.add("Тинькофф", "БКС", "Другой брокер/загрузить собственный список")
     msg = bot.send_message(message.chat.id, "Выберете брокера из которого хотите загрузить данные:",
                            reply_markup=markup)
-    bot.register_next_step_handler(msg, handle_broker_choice, **{"time_choice": time_choice})
+    bot.register_next_step_handler(msg, handle_broker_choice)
 
 
-def handle_broker_choice(message: types.Message, time_choice: tuple):
+def handle_broker_choice(message: types.Message):
     """
     Handles the user's selection of a broker and proceeds to appropriate actions based on the selection.
 
@@ -100,10 +136,10 @@ def handle_broker_choice(message: types.Message, time_choice: tuple):
     elif message.text == "Другой брокер/загрузить собственный список":
         msg = bot.send_message(message.chat.id, "Загрузить Excel-файл с колонками ticker, type. Подробнее: ",
                                reply_markup=types.ReplyKeyboardRemove())
-        bot.register_next_step_handler(msg, custom_tickers_handler, **{"time_choice": time_choice})
+        bot.register_next_step_handler(msg, custom_tickers_handler)
 
 
-def custom_tickers_handler(message: types.Message, time_choice: tuple):
+def custom_tickers_handler(message: types.Message):
     """
     Handles the custom tickers handler and updates tickers data based on the uploaded file.
 
@@ -121,7 +157,8 @@ def custom_tickers_handler(message: types.Message, time_choice: tuple):
         temp = tempfile.NamedTemporaryFile()
         with open(temp.name, "wb") as excel:
             excel.write(downloaded_file)
-        ticker_update.excel_update(temp.name, db_path, message.chat.id, time_choice)
+        ticker_update.excel_update(temp.name, db_path, message.chat.id)
+        bot.send_message(message.chat.id, "Тикеры добавлены")
 
 
 @bot.message_handler(commands=["get_report"])
@@ -148,8 +185,10 @@ def send_report(user_id: int):
     Returns:
         None
     """
-    data = data_handle.get_user_tickers(db_path, user_id)
-    bot.send_message(user_id, str(data))
+    user_ticker = data_handle.get_user_tickers(db_path, user_id)
+    data = moex.moex_counter(user_ticker)
+
+    bot.send_message(user_id, report.format_report(data))
 
 
 def create_jobs(job_dict: dict):

@@ -16,24 +16,30 @@ def setup_db(db_path: str):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
 
-def store_tickers(db: str, chat_id: int, tickers: pd.DataFrame, time_choice: tuple):
+def store_tickers(db_path: str, chat_id: int, tickers: pd.Series):
     """
     Stores tickers data in the database.
 
     Args:
-        db (str): The path to the database file.
+        db_path (str): The path to the database file.
         chat_id (int): The ID of the chat/user.
         tickers (pd.DataFrame): DataFrame containing tickers data.
-        time_choice (tuple): A tuple representing the time choice.
 
     Returns:
         None
     """
-    db = TinyDB(db)
-    db.insert({'chat_id': chat_id, "tickers": tickers.to_dict(), "time": time_choice})
+    db_path = TinyDB(db_path)
+    User = Query()
+    db_path.upsert({'chat_id': chat_id, "tickers": list(tickers.values)}, User.chat_id == chat_id)
 
 
-def get_user_tickers(db_path: str, chat_id: int) -> pd.DataFrame:
+def store_time(db_path: str, chat_id: int, time_choice: tuple):
+    db_path = TinyDB(db_path)
+    User = Query()
+    db_path.upsert({'chat_id': chat_id, "time": time_choice}, User.chat_id == chat_id)
+
+
+def get_user_tickers(db_path: str, chat_id: int) -> list:
     """
     Retrieves tickers data for a specific user from the database.
 
@@ -46,7 +52,7 @@ def get_user_tickers(db_path: str, chat_id: int) -> pd.DataFrame:
     """
     db = TinyDB(db_path)
     chat = Query()
-    return pd.DataFrame(db.get(chat.chat_id == chat_id)['tickers'])
+    return db.get(chat.chat_id == chat_id)['tickers']
 
 
 def get_user_time(db_path: str) -> dict:
