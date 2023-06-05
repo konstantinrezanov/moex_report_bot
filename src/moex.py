@@ -2,28 +2,18 @@ import datetime
 import pandas_datareader as pdr
 import pandas as pd
 from dateutil.relativedelta import relativedelta
+from pandas.tseries.offsets import BDay
 
 
-def to_fixed(numObj, digits=0):
-    return f"{numObj:.{digits}f}"
-
-
-def last_work_day():
-    lastBusDay = datetime.date.today()
-    if datetime.date.weekday(lastBusDay) == 5:  # if it's Saturday
-        lastBusDay = lastBusDay - datetime.timedelta(days=1)  # then make it Friday
-    elif datetime.date.weekday(lastBusDay) == 6:  # if it's Sunday
-        lastBusDay = lastBusDay - datetime.timedelta(days=2);  # then make it Friday
-    return lastBusDay
+def last_day():
+    today = datetime.datetime.now()
+    if today.weekday() in [5, 6] or today.hour < 19:  # if it's Saturday
+        return today - BDay(1)
+    return today
 
 
 def price_change(date_price, last_price):
-    if last_price >= date_price:
-        output = (((last_price / date_price) - (last_price // date_price)) * 100)
-        return to_fixed(output, 2)
-    elif last_price < date_price:
-        output = (last_price / date_price - 1) * 100
-        return to_fixed(output, 2)
+    return f"{(last_price / date_price - 1) * 100:.2f}"
 
 
 def moex_counter(ticker_list):
@@ -35,20 +25,19 @@ def moex_counter(ticker_list):
 
 
 def all_date_prices(ticker):
-    today = last_work_day()
-    MoM_date = today - relativedelta(months=1)
-    YoY_date = today - relativedelta(months=12)
-    f = pdr.get_data_moex(ticker, YoY_date)
-    g = pdr.get_data_moex(ticker, MoM_date)
-    # cho = f['CLOSE']
-    a = int(f.count()['WAVAL'])
-    YoYa = f.iloc[0]['CLOSE']
-    DoDa = f.iloc[a - 2]['CLOSE']
-    last_price = f.iloc[a - 1]['CLOSE']
-    WoWa = f.iloc[a - 6]['CLOSE']
-    MoMa = g.iloc[0]['CLOSE']
-    day_change = price_change(DoDa, last_price)
-    week_change = price_change(WoWa, last_price)
-    month_change = price_change(MoMa, last_price)
-    year_change = price_change(YoYa, last_price)
-    return last_price, day_change, week_change, month_change, year_change
+    today = last_day()
+    dod_date = today - relativedelta(days=1)
+    wow_date = today - relativedelta(weeks=1)
+    mom_date = today - relativedelta(months=1)
+    yoy_date = today - relativedelta(months=12)
+    print(yoy_date)
+    today_price = pdr.get_data_moex(ticker, today, today)['CLOSE'].iloc[0]
+    dod_price = pdr.get_data_moex(ticker, dod_date, dod_date)['CLOSE'].iloc[0]
+    wow_price = pdr.get_data_moex(ticker, wow_date, wow_date)['CLOSE'].iloc[0]
+    mom_price = pdr.get_data_moex(ticker, mom_date, mom_date)['CLOSE'].iloc[0]
+    yoy_price = pdr.get_data_moex(ticker, yoy_date, yoy_date)['CLOSE'].iloc[0]
+    day_change = price_change(dod_price, today_price)
+    week_change = price_change(wow_price, today_price)
+    month_change = price_change(mom_price, today_price)
+    year_change = price_change(yoy_price, today_price)
+    return today_price, day_change, week_change, month_change, year_change
