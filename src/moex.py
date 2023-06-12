@@ -2,13 +2,15 @@ import datetime
 import pandas_datareader as pdr
 import pandas as pd
 from dateutil.relativedelta import relativedelta
-from pandas.tseries.offsets import BDay
+from pandas.tseries.offsets import CustomBusinessDay
+
+moex_holidays = [datetime.date(2023, 6, 12)]
+moex_bday = CustomBusinessDay(holidays=moex_holidays)
 
 
-def last_day():
-    today = datetime.datetime.now()
-    if today.weekday() in [5, 6] or today.hour < 19:  # if it's Saturday
-        return today - BDay(1)
+def get_nearest_work_day(today: datetime.datetime):
+    if today.weekday() in [5, 6] or today.hour < 24:
+        return today - moex_bday(1)
     return today
 
 
@@ -25,12 +27,11 @@ def moex_counter(ticker_list):
 
 
 def all_date_prices(ticker):
-    today = last_day()
-    dod_date = today - relativedelta(days=1)
-    wow_date = today - relativedelta(weeks=1)
-    mom_date = today - relativedelta(months=1)
-    yoy_date = today - relativedelta(months=12)
-    print(yoy_date)
+    today = get_nearest_work_day(datetime.datetime.now())
+    dod_date = today - moex_bday(1)
+    wow_date = get_nearest_work_day(today - relativedelta(weeks=1))
+    mom_date = get_nearest_work_day(today - relativedelta(months=1))
+    yoy_date = get_nearest_work_day(today - relativedelta(months=12))
     today_price = pdr.get_data_moex(ticker, today, today)['CLOSE'].iloc[0]
     dod_price = pdr.get_data_moex(ticker, dod_date, dod_date)['CLOSE'].iloc[0]
     wow_price = pdr.get_data_moex(ticker, wow_date, wow_date)['CLOSE'].iloc[0]

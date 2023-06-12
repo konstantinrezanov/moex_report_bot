@@ -206,6 +206,7 @@ def create_jobs(job_dict: dict):
 
 
 def main():
+    data_handle.setup_db(db_path)
     create_jobs(data_handle.get_user_time(db_path))
     scheduler.start()
     bot.infinity_polling()
