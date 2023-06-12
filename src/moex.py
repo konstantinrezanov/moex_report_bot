@@ -10,7 +10,7 @@ moex_bday = CustomBusinessDay(holidays=moex_holidays)
 
 def get_nearest_work_day(today: datetime.datetime):
     if today.weekday() in [5, 6] or today.hour < 24:
-        return today - moex_bday(1)
+        return today - moex_bday
     return today
 
 
@@ -28,7 +28,7 @@ def moex_counter(ticker_list):
 
 def all_date_prices(ticker):
     today = get_nearest_work_day(datetime.datetime.now())
-    dod_date = today - moex_bday(1)
+    dod_date = today - moex_bday
     wow_date = get_nearest_work_day(today - relativedelta(weeks=1))
     mom_date = get_nearest_work_day(today - relativedelta(months=1))
     yoy_date = get_nearest_work_day(today - relativedelta(months=12))
