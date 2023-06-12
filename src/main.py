@@ -35,9 +35,9 @@ def send_welcome(message: types.Message):
                          'Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже')
         markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True,
                                                                 one_time_keyboard=True)
-        markup.add("В 19:00", "Другое")
+        markup.add("В 09:30", "Другое")
         msg = bot.send_message(message.chat.id,
-                               'Торги на MOEX закрываются в 19:00 (по МСК). В какое время вы хотите получать отчет?',
+                               'Торги на MOEX закрываются в 09:30 (по МСК). В какое время вы хотите получать отчет?',
                                reply_markup=markup)
         bot.register_next_step_handler(msg, time_select, **{"from_welcome": True})
     else:
@@ -55,8 +55,8 @@ def time_select(message: types.Message, from_welcome=False):
     Returns:
         None
     """
-    if message.text == "В 19:00":
-        chosen_time = (19, 0)
+    if message.text == "В 09:30":
+        chosen_time = (9, 30)
         data_handle.store_time(db_path, message.chat.id, chosen_time)
         bot.send_message(message.chat.id, "Время выбрано")
         if from_welcome:
@@ -71,9 +71,9 @@ def time_select(message: types.Message, from_welcome=False):
 def update_time(message: types.Message):
     markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True,
                                                             one_time_keyboard=True)
-    markup.add("В 19:00", "Другое")
+    markup.add("В 09:30", "Другое")
     msg = bot.send_message(message.chat.id,
-                           'Торги на MOEX закрываются в 19:00 (по МСК). В какое время вы хотите получать отчет?',
+                           'Торги на MOEX открываются в 09:30, во сколько вы хотите получать отчет?',
                            reply_markup=markup)
     bot.register_next_step_handler(msg, time_select)
 
