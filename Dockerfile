@@ -6,6 +6,8 @@ WORKDIR /app
 
 COPY requirements.txt ./
 
+RUN sudo apt-get install libatlas-base-dev
+
 RUN  python -m pip --no-cache-dir install -r requirements.txt --extra-index-url https://www.piwheels.org/simple
 
 COPY . .
