@@ -41,6 +41,7 @@ def time_select(message: types.Message, from_welcome=False):
     if message.text == "В 09:30":
         chosen_time = (9, 30)
         data_handle.store_time(db_path, message.chat.id, chosen_time)
+        create_jobs(data_handle.get_user_time(db_path))
         bot.send_message(message.chat.id, "Время выбрано")
         if from_welcome:
             update_ticker(message)
@@ -68,6 +69,7 @@ def custom_time(message: types.Message, from_welcome=False):
     try:
         user_choice = parse_time(message.text.strip())
         data_handle.store_time(db_path, message.chat.id, user_choice)
+        create_jobs(data_handle.get_user_time(db_path))
         msg = bot.send_message(message.chat.id, "Время выбрано")
         if from_welcome:
             update_ticker(msg)
@@ -136,7 +138,9 @@ def send_report(user_id: int):
 
 def create_jobs(job_dict: dict):
     for user_id, time in job_dict.items():
+        scheduler.remove_all_jobs()
         scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id})
+        scheduler.print_jobs()
 
 
 def main():
