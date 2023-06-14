@@ -20,4 +20,3 @@ tinydb==4.7.1
 tzlocal==2.1
 urllib3==2.0.2
 wheel==0.40.0
-numpy==1.22.0
