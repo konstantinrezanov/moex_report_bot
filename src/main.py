@@ -1,5 +1,6 @@
 import datetime
 
+import pandas as pd
 import telebot
 from telebot import types
 from telebot.types import ReplyKeyboardMarkup
@@ -19,17 +20,8 @@ db_path = "./data/tickers.json"
 scheduler = BackgroundScheduler()
 
 
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message: types.Message):
-    """
-    Handles the '/start' and '/help' commands and sends a welcome message to the user.
-
-    Args:
-        message (types.Message): The received message object.
-
-    Returns:
-        None
-    """
     if message.chat.id not in data_handle.get_users(db_path):
         bot.send_message(message.chat.id,
                          'Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже')
@@ -37,7 +29,7 @@ def send_welcome(message: types.Message):
                                                                 one_time_keyboard=True)
         markup.add("В 09:30", "Другое")
         msg = bot.send_message(message.chat.id,
-                               'Торги на MOEX закрываются в 09:30 (по МСК). В какое время вы хотите получать отчет?',
+                               'Торги на MOEX открываются в 09:30 (по МСК). В какое время вы хотите получать отчет?',
                                reply_markup=markup)
         bot.register_next_step_handler(msg, time_select, **{"from_welcome": True})
     else:
@@ -46,15 +38,6 @@ def send_welcome(message: types.Message):
 
 
 def time_select(message: types.Message, from_welcome=False):
-    """
-    Handles the user's selection of time and proceeds to update_ticker function.
-
-    Args:
-        message (types.Message): The received message object.
-
-    Returns:
-        None
-    """
     if message.text == "В 09:30":
         chosen_time = (9, 30)
         data_handle.store_time(db_path, message.chat.id, chosen_time)
@@ -66,6 +49,9 @@ def time_select(message: types.Message, from_welcome=False):
         msg = bot.send_message(message.chat.id, "Введите желаемое время в формате 00:00")
         bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
 
+@bot.message_handler(commands=['help'])
+def handle_help(message: types.Message):
+    bot.send_message(message.chat.id, "Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже")
 
 @bot.message_handler(commands=['update_time'])
 def update_time(message: types.Message):
@@ -100,56 +86,31 @@ def parse_time(time_input: str) -> tuple:
 
 @bot.message_handler(commands=['update_tickers'])
 def update_ticker(message: types.Message):
-    """
-    Handles the '/update_tickers' command and prompts the user to choose a broker for data update.
-
-    Args:
-        message (types.Message): The received message object.
-
-    Returns:
-        None
-    """
     markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True)
-    markup.add("Тинькофф", "БКС", "Другой брокер/загрузить собственный список")
-    msg = bot.send_message(message.chat.id, "Выберете брокера из которого хотите загрузить данные:",
+    markup.add("Сообщение", "Excel-таблица")
+    msg = bot.send_message(message.chat.id, "Выберете способ загрузки тикеров",
                            reply_markup=markup)
     bot.register_next_step_handler(msg, handle_broker_choice)
 
 
 def handle_broker_choice(message: types.Message):
-    """
-    Handles the user's selection of a broker and proceeds to appropriate actions based on the selection.
-
-    Args:
-        message (types.Message): The received message object.
-        time_choice (tuple): A tuple representing the time choice.
-
-    Returns:
-        None
-    """
-    if message.text == "Тинькофф":
-        msg = bot.send_message(message.chat.id, "Отправьте Excel-файл с отчетом",
+    if message.text == "Сообщение":
+        msg = bot.send_message(message.chat.id, "Напишите список тикеров через запятую.\nПример: SBER, VTBR",
                                reply_markup=types.ReplyKeyboardRemove())
-    elif message.text == "БКС":
-        msg = bot.send_message(message.chat.id, "Отправьте Excel-файл с отчетом",
-                               reply_markup=types.ReplyKeyboardRemove())
-    elif message.text == "Другой брокер/загрузить собственный список":
+        bot.register_next_step_handler(msg, message_ticker_handler)
+    elif message.text == "Excel-таблица":
         msg = bot.send_message(message.chat.id, "Загрузить Excel-файл с колонками ticker, type. Подробнее: ",
                                reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, custom_tickers_handler)
 
 
+def message_ticker_handler(message: types.Message):
+    user_tickers = [x.upper() for x in message.text.strip().split(", ")]
+    data_handle.store_tickers(db_path, message.chat.id, pd.Series(user_tickers))
+    bot.send_message(message.chat.id, "Тикеры добавлены")
+
+
 def custom_tickers_handler(message: types.Message):
-    """
-    Handles the custom tickers handler and updates tickers data based on the uploaded file.
-
-    Args:
-        message (types.Message): The received message object.
-        time_choice (tuple): A tuple representing the time choice.
-
-    Returns:
-        None
-    """
     if message.document.mime_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                       "application/vnd.ms-excel"]:
         file_info = bot.get_file(message.document.file_id)
@@ -163,28 +124,10 @@ def custom_tickers_handler(message: types.Message):
 
 @bot.message_handler(commands=["get_report"])
 def get_report(message: types.Message):
-    """
-    Handles the '/get_report' command and sends the report to the user.
-
-    Args:
-        message (types.Message): The received message object.
-
-    Returns:
-        None
-    """
     send_report(message.chat.id)
 
 
 def send_report(user_id: int):
-    """
-    Retrieves the user's tickers data and sends it as a message to the user.
-
-    Args:
-        user_id (int): The ID of the user.
-
-    Returns:
-        None
-    """
     user_ticker = data_handle.get_user_tickers(db_path, user_id)
     data = moex.moex_counter(user_ticker)
 
@@ -192,15 +135,6 @@ def send_report(user_id: int):
 
 
 def create_jobs(job_dict: dict):
-    """
-    Creates scheduled jobs for sending reports based on the job dictionary.
-
-    Args:
-        job_dict (dict): A dictionary containing user IDs as keys and time choices as values.
-
-    Returns:
-        None
-    """
     for user_id, time in job_dict.items():
         scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id})
 
