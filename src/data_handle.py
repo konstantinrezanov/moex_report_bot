@@ -29,7 +29,10 @@ def set_jobs_dict(db_path: str) -> dict:
     db = TinyDB(db_path)
     jobs = {}
     for user in db.all():
-        jobs[user["chat_id"]] = tuple(user["time"])
+        try:
+            jobs[user["chat_id"]] = tuple(user["time"])
+        except KeyError:
+            continue
 
     return jobs
 
