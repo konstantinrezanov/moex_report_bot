@@ -25,13 +25,19 @@ def get_user_tickers(db_path: str, chat_id: int) -> list:
     return db.get(chat.chat_id == chat_id)['tickers']
 
 
-def get_user_time(db_path: str) -> dict:
+def set_jobs_dict(db_path: str) -> dict:
     db = TinyDB(db_path)
     jobs = {}
     for user in db.all():
         jobs[user["chat_id"]] = tuple(user["time"])
 
     return jobs
+
+
+def get_user_time(db_path: str, chat_id: int) -> tuple:
+    db = TinyDB(db_path)
+    chat = Query()
+    return db.get(chat.chat_id == chat_id)['time']
 
 
 def get_users(db_path: str) -> list:
