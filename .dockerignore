@@ -1,2 +1,4 @@
 /data
 /.github
+/jobs.sqlite
+/moex.sqlite

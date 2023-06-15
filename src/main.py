@@ -4,6 +4,9 @@ import telebot
 from telebot import types
 from telebot.types import ReplyKeyboardMarkup
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+import requests_cache
 import data_handle
 import ticker_update
 import tempfile
@@ -16,11 +19,27 @@ bot = telebot.TeleBot(telegram_api_key, parse_mode=None)
 
 db_path = "./data/tickers.json"
 
-scheduler = BackgroundScheduler()
+jobstores = {
+    "default": SQLAlchemyJobStore(url='sqlite:///jobs.sqlite'),
+    "cache": MemoryJobStore()
+}
+
+scheduler = BackgroundScheduler(jobstores=jobstores)
+
+session = requests_cache.CachedSession(cache_name="moex", backend="sqlite")
 
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message: types.Message):
+    """
+    Handles the 'start' command and initializes the bot.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     if message.chat.id not in data_handle.get_users(db_path):
         bot.send_message(message.chat.id,
                          'Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже')
@@ -37,6 +56,16 @@ def send_welcome(message: types.Message):
 
 
 def time_select(message: types.Message, from_welcome=False):
+    """
+    Handles the time selection for report delivery.
+
+    Args:
+        message (types.Message): The received message object.
+        from_welcome (bool): Indicates if the function is called from the welcome message.
+
+    Returns:
+        None
+    """
     if message.text == "В 09:30":
         chosen_time = (9, 30)
         data_handle.store_time(db_path, message.chat.id, chosen_time)
@@ -52,11 +81,29 @@ def time_select(message: types.Message, from_welcome=False):
 
 @bot.message_handler(commands=['help'])
 def handle_help(message: types.Message):
+    """
+    Handles the 'help' command and sends the help message.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     bot.send_message(message.chat.id, "Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже")
 
 
 @bot.message_handler(commands=['update_time'])
 def update_time(message: types.Message):
+    """
+    Handles the 'update_time' command and prompts the user to update the report delivery time.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True,
                                                             one_time_keyboard=True)
     markup.add("В 09:30", "Другое")
@@ -67,6 +114,16 @@ def update_time(message: types.Message):
 
 
 def custom_time(message: types.Message, from_welcome=False):
+    """
+    Handles the custom time input for report delivery.
+
+    Args:
+        message (types.Message): The received message object.
+        from_welcome (bool): Indicates if the function is called from the welcome message.
+
+    Returns:
+        None
+    """
     try:
         user_choice = parse_time(message.text.strip())
         data_handle.store_time(db_path, message.chat.id, user_choice)
@@ -80,6 +137,18 @@ def custom_time(message: types.Message, from_welcome=False):
 
 
 def parse_time(time_input: str) -> tuple:
+    """
+    Parses the user-inputted time and returns a tuple of (hour, minute).
+
+    Args:
+        time_input (str): The user-inputted time in the format HH:MM.
+
+    Returns:
+        tuple: A tuple of (hour, minute).
+
+    Raises:
+        ValueError: If the time format is incorrect.
+    """
     try:
         time = datetime.datetime.strptime(time_input, "%H:%M")
         return time.hour, time.minute
@@ -89,6 +158,15 @@ def parse_time(time_input: str) -> tuple:
 
 @bot.message_handler(commands=['update_tickers'])
 def update_ticker(message: types.Message):
+    """
+    Handles the 'update_tickers' command and prompts the user to choose the method of updating tickers.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     markup: ReplyKeyboardMarkup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True)
     markup.add("Сообщение", "Excel-таблица")
     msg = bot.send_message(message.chat.id, "Выберете способ загрузки тикеров",
@@ -97,6 +175,15 @@ def update_ticker(message: types.Message):
 
 
 def handle_broker_choice(message: types.Message):
+    """
+    Handles the user's choice of ticker update method.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     if message.text == "Сообщение":
         msg = bot.send_message(message.chat.id, "Напишите список тикеров через запятую.\nПример: SBER, VTBR",
                                reply_markup=types.ReplyKeyboardRemove())
@@ -108,12 +195,30 @@ def handle_broker_choice(message: types.Message):
 
 
 def message_ticker_handler(message: types.Message):
+    """
+    Handles the user-inputted tickers in the message format.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     user_tickers = [x.upper() for x in message.text.strip().split(", ")]
     data_handle.store_tickers(db_path, message.chat.id, pd.Series(user_tickers))
     bot.send_message(message.chat.id, "Тикеры добавлены")
 
 
 def custom_tickers_handler(message: types.Message):
+    """
+    Handles the user-inputted tickers in the custom Excel file format.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     if message.document.mime_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                       "application/vnd.ms-excel"]:
         file_info = bot.get_file(message.document.file_id)
@@ -127,24 +232,62 @@ def custom_tickers_handler(message: types.Message):
 
 @bot.message_handler(commands=["get_report"])
 def get_report(message: types.Message):
+    """
+    Handles the 'get_report' command and sends the portfolio report to the user.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     send_report(message.chat.id)
 
 
 def send_report(user_id: int):
-    user_ticker = data_handle.get_user_tickers(db_path, user_id)
-    data = moex.moex_counter(user_ticker)
+    """
+    Sends the portfolio report to the specified user.
 
+    Args:
+        user_id (int): The ID of the user.
+
+    Returns:
+        None
+    """
+    user_ticker = data_handle.get_user_tickers(db_path, user_id)
+    msg = bot.send_message(user_id, "Пожалуйста, подождите...", disable_notification=True)
+    data = moex.moex_counter(user_ticker)
+    bot.delete_message(user_id, msg.id)
     bot.send_message(user_id, report.format_report(data))
 
 
 def create_jobs(job_dict: dict):
+    """
+    Creates the scheduler jobs for sending regular portfolio reports.
+
+    Args:
+        job_dict (dict): A dictionary containing user IDs as keys and report delivery times as values.
+
+    Returns:
+        None
+    """
     for user_id, time in job_dict.items():
         scheduler.remove_all_jobs()
-        scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id})
+        scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id},
+                          jobstore="default")
 
 
 @bot.message_handler(commands=['get_tickers'])
 def get_tickers(message: types.Message):
+    """
+    Handles the 'get_tickers' command and sends the user's tickers.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     user_tickers = data_handle.get_user_tickers(db_path, message.chat.id)
     bot.send_message(message.chat.id,
                      "Ваши тикеры:\n" + "\n".join([f"{i + 1}. {ticker}" for i, ticker in enumerate(user_tickers)]))
@@ -152,14 +295,26 @@ def get_tickers(message: types.Message):
 
 @bot.message_handler(commands=['get_time'])
 def get_time(message: types.Message):
+    """
+    Handles the 'get_time' command and sends the user's report delivery time.
+
+    Args:
+        message (types.Message): The received message object.
+
+    Returns:
+        None
+    """
     user_time = data_handle.get_user_time(db_path, message.chat.id)
-    bot.send_message(message.chat.id, f"Ваше время:\n {user_time[0]}:{user_time[1]}")
+    bot.send_message(message.chat.id, f"Время доставки отчета: {user_time[0]:02d}:{user_time[1]:02d}")
+
+def clear_cache():
+    session.cache.clear()
 
 
 def main():
     data_handle.setup_db(db_path)
-    create_jobs(data_handle.set_jobs_dict(db_path))
     scheduler.start()
+    scheduler.add_job(clear_cache, "cron", hour=0, minute=0, jobstore="cache")
     bot.infinity_polling()
 
 
