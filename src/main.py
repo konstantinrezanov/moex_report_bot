@@ -1,5 +1,4 @@
 import datetime
-
 import pandas as pd
 import telebot
 from telebot import types
@@ -41,8 +40,8 @@ def time_select(message: types.Message, from_welcome=False):
     if message.text == "В 09:30":
         chosen_time = (9, 30)
         data_handle.store_time(db_path, message.chat.id, chosen_time)
-        create_jobs(data_handle.get_user_time(db_path))
-        bot.send_message(message.chat.id, "Время выбрано")
+        create_jobs(data_handle.set_jobs_dict(db_path))
+        bot.send_message(message.chat.id, "Время выбрано", reply_markup=types.ReplyKeyboardRemove())
         if from_welcome:
             update_ticker(message)
 
@@ -50,9 +49,11 @@ def time_select(message: types.Message, from_welcome=False):
         msg = bot.send_message(message.chat.id, "Введите желаемое время в формате 00:00")
         bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
 
+
 @bot.message_handler(commands=['help'])
 def handle_help(message: types.Message):
     bot.send_message(message.chat.id, "Этот бот предоставляет регулярные отчеты о вашем портфеле на Московской Бирже")
+
 
 @bot.message_handler(commands=['update_time'])
 def update_time(message: types.Message):
@@ -69,8 +70,8 @@ def custom_time(message: types.Message, from_welcome=False):
     try:
         user_choice = parse_time(message.text.strip())
         data_handle.store_time(db_path, message.chat.id, user_choice)
-        create_jobs(data_handle.get_user_time(db_path))
-        msg = bot.send_message(message.chat.id, "Время выбрано")
+        create_jobs(data_handle.set_jobs_dict(db_path))
+        msg = bot.send_message(message.chat.id, "Время выбрано", reply_markup=types.ReplyKeyboardRemove())
         if from_welcome:
             update_ticker(msg)
     except ValueError:
@@ -140,12 +141,24 @@ def create_jobs(job_dict: dict):
     for user_id, time in job_dict.items():
         scheduler.remove_all_jobs()
         scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id})
-        scheduler.print_jobs()
+
+
+@bot.message_handler(commands=['get_tickers'])
+def get_tickers(message: types.Message):
+    user_tickers = data_handle.get_user_tickers(db_path, message.chat.id)
+    bot.send_message(message.chat.id,
+                     "Ваши тикеры:\n" + "\n".join([f"{i + 1}. {ticker}" for i, ticker in enumerate(user_tickers)]))
+
+
+@bot.message_handler(commands=['get_time'])
+def get_time(message: types.Message):
+    user_time = data_handle.get_user_time(db_path, message.chat.id)
+    bot.send_message(message.chat.id, f"Ваше время:\n {user_time[0]}:{user_time[1]}")
 
 
 def main():
     data_handle.setup_db(db_path)
-    create_jobs(data_handle.get_user_time(db_path))
+    create_jobs(data_handle.set_jobs_dict(db_path))
     scheduler.start()
     bot.infinity_polling()
 
