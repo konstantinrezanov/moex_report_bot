@@ -15,18 +15,18 @@ import moex
 import report
 
 telegram_api_key = os.getenv('TELEGRAM_API_KEY')
-bot = telebot.TeleBot(telegram_api_key, parse_mode=None)
+bot = telebot.TeleBot(telegram_api_key, parse_mode=None)  # Initializes the bot
 
-db_path = "./data/tickers.json"
+db_path = "./data/tickers.json"  # path tot the database that stores user tickers
 
 jobstores = {
     "default": SQLAlchemyJobStore(url='sqlite:///jobs.sqlite'),
     "cache": MemoryJobStore()
 }
 
-scheduler = BackgroundScheduler(jobstores=jobstores)
+scheduler = BackgroundScheduler(jobstores=jobstores)  # Creates a scheduler
 
-session = requests_cache.CachedSession(cache_name="moex", backend="sqlite")
+session = requests_cache.CachedSession(cache_name="moex", backend="sqlite")  # Creates cache session
 
 
 @bot.message_handler(commands=['start'])
@@ -80,8 +80,8 @@ def time_select(message: types.Message, from_welcome=False):
     """
     if message.text == "В 09:30":
         chosen_time = (9, 30)
-        data_handle.store_time(db_path, message.chat.id, chosen_time)
-        create_jobs(data_handle.set_jobs_dict(db_path))
+        data_handle.store_time(db_path, message.chat.id, chosen_time)  # Saves time to the database
+        create_jobs(data_handle.set_jobs_dict(db_path))  # Create jobs user database
         bot.send_message(message.chat.id, "Время выбрано", reply_markup=types.ReplyKeyboardRemove())
         if from_welcome:
             update_ticker(message)
@@ -151,7 +151,7 @@ def custom_time(message: types.Message, from_welcome=False):
         create_jobs(data_handle.set_jobs_dict(db_path))
         msg = bot.send_message(message.chat.id, "Время выбрано", reply_markup=types.ReplyKeyboardRemove())
         if from_welcome:
-            update_ticker(msg)
+            update_ticker(msg)  # If called from welcome, proceeds to updating tickers
     except ValueError:
         msg = bot.send_message(message.chat.id, "Неверный формат времени")
         bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
@@ -171,7 +171,7 @@ def parse_time(time_input: str) -> tuple:
         ValueError: If the time format is incorrect.
     """
     try:
-        time = datetime.datetime.strptime(time_input, "%H:%M")
+        time = datetime.datetime.strptime(time_input, "%H:%M")  # Parses time from user input
         return time.hour, time.minute
     except:
         raise ValueError
@@ -225,8 +225,9 @@ def message_ticker_handler(message: types.Message):
     Returns:
         None
     """
-    user_tickers = [x.upper() for x in message.text.strip().split(", ")]
-    data_handle.store_tickers(db_path, message.chat.id, pd.Series(user_tickers))
+    user_tickers = [x.upper() for x in
+                    message.text.strip().split(", ")]  # Splits user message by ", " and stores tickers
+    data_handle.store_tickers(db_path, message.chat.id, pd.Series(user_tickers))  # Saves tickers to the database
     bot.send_message(message.chat.id, "Тикеры добавлены")
 
 
@@ -243,10 +244,10 @@ def custom_tickers_handler(message: types.Message):
     if message.document.mime_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                       "application/vnd.ms-excel"]:
         file_info = bot.get_file(message.document.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
+        downloaded_file = bot.download_file(file_info.file_path)  # Downloads user excel table
         temp = tempfile.NamedTemporaryFile()
         with open(temp.name, "wb") as excel:
-            excel.write(downloaded_file)
+            excel.write(downloaded_file)  # Saves it in the temporary file
         ticker_update.excel_update(temp.name, db_path, message.chat.id)
         bot.send_message(message.chat.id, "Тикеры добавлены")
 
@@ -276,10 +277,10 @@ def send_report(user_id: int):
         None
     """
     user_ticker = data_handle.get_user_tickers(db_path, user_id)
-    msg = bot.send_message(user_id, "Пожалуйста, подождите...", disable_notification=True)
-    data = moex.moex_counter(user_ticker)
-    bot.delete_message(user_id, msg.id)
-    bot.send_message(user_id, report.format_report(data))
+    msg = bot.send_message(user_id, "Пожалуйста, подождите...", disable_notification=True)  # Sends temporary message
+    data = moex.moex_counter(user_ticker, session)  # Gets data from MOEX
+    bot.delete_message(user_id, msg.id)  # Deletes temporary message
+    bot.send_message(user_id, report.format_report(data))  # Sends report to the user
 
 
 def create_jobs(job_dict: dict):
@@ -292,10 +293,10 @@ def create_jobs(job_dict: dict):
     Returns:
         None
     """
+    scheduler.remove_all_jobs(jobstore="default")  # Deletes all existing jobs, in order to prevent duplicates
     for user_id, time in job_dict.items():
-        scheduler.remove_all_jobs()
         scheduler.add_job(send_report, 'cron', hour=time[0], minute=time[1], kwargs={"user_id": user_id},
-                          jobstore="default")
+                          jobstore="default")  # Stores jobs to send user reports
 
 
 @bot.message_handler(commands=['get_tickers'])
@@ -311,7 +312,8 @@ def get_tickers(message: types.Message):
     """
     user_tickers = data_handle.get_user_tickers(db_path, message.chat.id)
     bot.send_message(message.chat.id,
-                     "Ваши тикеры:\n" + "\n".join([f"{i + 1}. {ticker}" for i, ticker in enumerate(user_tickers)]))
+                     "Ваши тикеры:\n" + "\n".join(
+                         [f"{i + 1}. {ticker}" for i, ticker in enumerate(user_tickers)]))  # Sends tickers to the user
 
 
 @bot.message_handler(commands=['get_time'])
@@ -326,16 +328,19 @@ def get_time(message: types.Message):
         None
     """
     user_time = data_handle.get_user_time(db_path, message.chat.id)
-    bot.send_message(message.chat.id, f"Время доставки отчета: {user_time[0]:02d}:{user_time[1]:02d}")
+    bot.send_message(message.chat.id,
+                     f"Время доставки отчета: {user_time[0]:02d}:{user_time[1]:02d}")  # Send time to the user
+
 
 def clear_cache():
     session.cache.clear()
 
 
 def main():
-    data_handle.setup_db(db_path)
-    scheduler.start()
-    scheduler.add_job(clear_cache, "cron", hour=0, minute=0, jobstore="cache")
+    data_handle.setup_db(db_path)  # Setup database if it doesn't exist
+    scheduler.start()  # Starts scheduler
+    scheduler.add_job(clear_cache, "cron", hour=0, minute=0,
+                      jobstore="cache")  # Adds job to clear session cache every 24 hours
     bot.infinity_polling()
 
 
