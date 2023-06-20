@@ -153,7 +153,7 @@ def custom_time(message: types.Message, from_welcome=False):
         if from_welcome:
             update_ticker(msg)  # If called from welcome, proceeds to updating tickers
     except ValueError:
-        msg = bot.send_message(message.chat.id, "Неверный формат времени")
+        msg = bot.send_message(message.chat.id, "Неверный формат времени. Введите снова:")
         bot.register_next_step_handler(msg, custom_time, **{"from_welcome": from_welcome})
 
 
@@ -210,7 +210,7 @@ def handle_broker_choice(message: types.Message):
                                reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, message_ticker_handler)
     elif message.text == "Excel-таблица":
-        msg = bot.send_message(message.chat.id, "Загрузить Excel-файл с колонками ticker, type. Подробнее: ",
+        msg = bot.send_message(message.chat.id, "Загрузить Excel-файл с колонками ticker, type. Подробнее: https://telegra.ph/Oformlenie-Excel-tablicy-06-20 ",
                                reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, custom_tickers_handler)
 
