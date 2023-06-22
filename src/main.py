@@ -1,4 +1,5 @@
 import datetime
+import string
 import pandas as pd
 import telebot
 from telebot import types
@@ -210,7 +211,8 @@ def handle_broker_choice(message: types.Message):
                                reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, message_ticker_handler)
     elif message.text == "Excel-таблица":
-        msg = bot.send_message(message.chat.id, "Загрузить Excel-файл с колонками ticker, type. Подробнее: https://telegra.ph/Oformlenie-Excel-tablicy-06-20 ",
+        msg = bot.send_message(message.chat.id,
+                               "Загрузить Excel-файл с колонками ticker, type. Подробнее: https://telegra.ph/Oformlenie-Excel-tablicy-06-20 ",
                                reply_markup=types.ReplyKeyboardRemove())
         bot.register_next_step_handler(msg, custom_tickers_handler)
 
@@ -225,7 +227,7 @@ def message_ticker_handler(message: types.Message):
     Returns:
         None
     """
-    user_tickers = [x.upper() for x in
+    user_tickers = [x.upper().translate(str.maketrans('', '', string.punctuation)) for x in
                     message.text.strip().split(", ")]  # Splits user message by ", " and stores tickers
     data_handle.store_tickers(db_path, message.chat.id, pd.Series(user_tickers))  # Saves tickers to the database
     bot.send_message(message.chat.id, "Тикеры добавлены")
